@@ -12,7 +12,7 @@ import seaborn as sns
 palette = sns.color_palette('Paired',10)
 
 #读取指定行数据，把pickup_datetime字段解析成日期格式
-data = pd.read_csv('./data/train.csv',nrows=5000,parse_dates=['pickup_datetime']).drop(columns="key")
+data = pd.read_csv('./data/train.csv',nrows=50000,).drop(columns="key")
 #剔除缺失值
 data = data.dropna()
 #查看数据前五行
@@ -243,4 +243,90 @@ corrs['fare_amount'].plot.bar(color = 'b')
 plt.title('correlation with Fare Amount')
 plt.show()
 
+#开始建立模型
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
 
+lr = LinearRegression()
+#为了使stratify拆分数据集更加均衡
+x_t,x_v,y_t,y_v = train_test_split(data,np.array(data['fare_amount']),stratify=data['fare-bin'],random_state=RSEED,test_size=10000)
+lr.fit(x_t[["abs_lat_diff","abs_lon_diff","passenger_count"]],y_t)
+print('截距：%d'%round(lr.intercept_,4))
+print("abs_laf_diff:%f \n abs_lon_diff:%f \n passenger_count:%f \n"%(round(lr.coef_[0],4),round(lr.coef_[1],4),round(lr.coef_[2],4)))
+
+from sklearn.metrics import mean_squared_error
+#rmse均方根误差 mape平均绝对百分误差
+def metrics(t_p,v_p,y_t,y_v):
+    train_rmse = np.sqrt(mean_squared_error(y_t,t_p))
+    valid_rmse = np.sqrt(mean_squared_error(y_v,v_p))
+
+    train_ape = abs((y_t-t_p)/y_t)
+    valid_ape = abs((y_v-v_p)/y_v)
+    #把无穷大的值置为0
+    train_ape[train_ape == np.inf] = 0
+    train_ape[train_ape == -np.inf] = 0
+    valid_ape[valid_ape == np.inf] = 0
+    valid_ape[valid_ape == -np.inf] = 0
+
+    train_mape = 100*np.mean(train_ape)
+    valid_mape = 100*np.mean(valid_ape)
+    return train_rmse,valid_rmse,train_mape,valid_mape
+
+def eva(model,fea,x_t,x_v,y_t,y_v):
+    if fea !=0:
+        train_pred = model.predict(x_t[fea])
+        valid_pred = model.predict(x_v[fea])
+    else:
+        train_pred = model.predict(x_t)
+        valid_pred = model.predict(x_v)
+    train_rmse,valid_rmse,train_mape,valid_mape = metrics(train_pred,valid_pred,y_t,y_v)
+    print(f'Training:   rmse = {round(train_rmse, 2)} \t mape = {round(train_mape, 2)}')
+    print(f'Validation: rmse = {round(valid_rmse, 2)} \t mape = {round(valid_mape, 2)}')
+
+eva(lr,["abs_lat_diff","abs_lon_diff","passenger_count"],x_t,x_v,y_t,y_v)
+
+#随便预测，评价好坏
+train_mean = y_t.mean()
+train_preds = [train_mean for _ in range(len(y_t))]
+valid_preds = [train_mean for _ in range(len(y_v))]
+tr,vr,tm,vm = metrics(train_preds,valid_preds,y_t,y_v)
+print(f'Baseline Training:   rmse = {round(tr, 2)} \t mape = {round(tm, 2)}')
+print(f'Baseline Validation: rmse = {round(vr, 2)} \t mape = {round(vm, 2)}')
+
+preds = lr.predict(test[['abs_lat_diff','abs_lon_diff','passenger_count']])
+sub = pd.DataFrame({'key':test_id,'fare_amount':preds})
+sub.to_csv('sub_lr_simple.csv',index=False)
+#查看预测价格的分布
+sns.distplot(sub['fare_amount'])
+plt.title("Distribution of Linear Regression Predictions")
+
+#查看预测大于100的异常值
+print(test.loc[sub[sub['fare_amount']>100].index])
+print(sub[sub['fare_amount']>100])
+
+simple_over_100 = list(sub[sub['fare_amount'] > 100].index)
+sub['fare_amount'].describe()
+
+#使用更多的特征
+lr.fit(x_t[['haversine','abs_lat_diff','abs_lon_diff','passenger_count']],y_t)
+
+eva(lr,['haversine','abs_lat_diff','abs_lon_diff','passenger_count'],x_t,x_v,y_t,y_v)
+print(lr.intercept_)
+print(lr.coef_)
+
+#使用日期
+data2 = pd.get_dummies(data[['haversine','abs_lat_diff','abs_lon_diff','passenger_count','pickup_datetime','fare_amount','fare-bin']])
+x_t,x_v,y_t,y_v = train_test_split(data2,np.array(data2['fare_amount']),random_state=RSEED,test_size=10000,stratify=data2['fare-bin'])
+x_t = x_t.drop(columns="fare-bin")
+x_v = y_t.drop(columns="fare-bin")
+lr.fit(x_t[['haversine','abs_lat_diff','abs_lon_diff','passenger_count'],y_t])
+
+eva(lr,1,x_t,x_v,y_t,y_v)
+print('带有日期:')
+print(lr.intercept_)
+print(lr.coef_)
+
+#热力图
+corrs = data.corr()
+plt.figure(figsize=(12,12))
+sns.heatmap(corrs,annot=True,vmin=-1,vmax=1,fmt='.3f')

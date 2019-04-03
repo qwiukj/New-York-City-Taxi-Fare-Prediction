@@ -11,3 +11,6 @@ import pandas as pd
 data = pd.read_csv('./data/train.csv',nrows=500)
 data['ss'] = data['pickup_datetime'].map(lambda x:str(x[5:7]))
 print(data['ss'])
+
+m = 1
+print([m for _ in range(5)])
