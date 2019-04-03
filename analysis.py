@@ -219,12 +219,6 @@ sns.kdeplot(test['haversine'])
 plt.show()
 
 
-#相关性
-corrs = data.corr()
-corrs['fare_amount'].plot.bar(color = 'b')
-plt.title('correlation with Fare Amount')
-plt.show()
-
 #日期相关性
 data["new_date"] = data['pickup_datetime'].map(lambda x:str(x[5:7]))
 print(data.groupby('new_date')['fare_amount'].agg(['mean','count']))
@@ -241,6 +235,12 @@ data['new_date'].value_counts().plot.bar(color = 'b',edgecolor = 'k')
 plt.title('new_date counts')
 plt.xlabel('new_date')
 plt.ylabel('count')
+plt.show()
+
+#相关性
+corrs = data.corr()
+corrs['fare_amount'].plot.bar(color = 'b')
+plt.title('correlation with Fare Amount')
 plt.show()
 
 
