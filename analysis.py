@@ -315,11 +315,11 @@ print(lr.intercept_)
 print(lr.coef_)
 
 #使用日期
-data2 = pd.get_dummies(data[['haversine','abs_lat_diff','abs_lon_diff','passenger_count','pickup_datetime','fare_amount','fare-bin']])
+data2 = pd.get_dummies(data[['haversine','abs_lat_diff','abs_lon_diff','passenger_count','pickup_datetime','fare_amount','fare-bin']],columns="pickup_datetime")
 x_t,x_v,y_t,y_v = train_test_split(data2,np.array(data2['fare_amount']),random_state=RSEED,test_size=10000,stratify=data2['fare-bin'])
 x_t = x_t.drop(columns="fare-bin")
 x_v = y_t.drop(columns="fare-bin")
-lr.fit(x_t[['haversine','abs_lat_diff','abs_lon_diff','passenger_count'],y_t])
+lr.fit(x_t,y_t)
 
 eva(lr,1,x_t,x_v,y_t,y_v)
 print('带有日期:')
