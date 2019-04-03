@@ -32,6 +32,7 @@ print("价格大于100的异常值个数为%d"%len(data[data['fare_amount'] > 10
 #剔除价格异常的数据
 data = data[data['fare_amount'].between(left = 2.5,right = 100)]
 
+#把价格数据连续值分为离散值
 data['fare-bin'] = pd.cut(data['fare_amount'],bins = list(range(0,50,5))).astype(str)
 #把超过45的数据列修改为[45+],其中loc传入的参数左边为行，右边为列
 data.loc[data['fare-bin'] == 'nan','fare-bin'] = '[45+]'
