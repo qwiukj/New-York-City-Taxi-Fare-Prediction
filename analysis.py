@@ -27,7 +27,7 @@ plt.title("Distribution of Fare")
 plt.show()
 
 print("价格小于0的异常值个数为%d"%len(data[data['fare_amount'] < 0]))
-print("价格小于零的异常值个数为%d"%len(data[data['fare_amount'] == 0]))
+print("价格等于零的异常值个数为%d"%len(data[data['fare_amount'] == 0]))
 print("价格大于100的异常值个数为%d"%len(data[data['fare_amount'] > 100]))
 #剔除价格异常的数据
 data = data[data['fare_amount'].between(left = 2.5,right = 100)]
