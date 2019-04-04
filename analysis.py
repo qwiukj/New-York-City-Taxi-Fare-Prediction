@@ -226,7 +226,7 @@ data.groupby('new_date')['fare_amount'].mean().plot.bar(color = 'b')
 
 plt.figure(figsize = (12, 6))
 for f, grouped in data.groupby('new_date'):
-    sns.kdeplot(grouped['fare_amount'], label = f'{f}', color = list(grouped['color'])[0]);
+    sns.kdeplot(grouped['fare_amount'], label = f'{f}')
 plt.xlabel('fare_amount'); plt.ylabel('density')
 plt.title('Distribution of Fare Amount by date')
 plt.show()
@@ -273,7 +273,7 @@ def metrics(t_p,v_p,y_t,y_v):
     return train_rmse,valid_rmse,train_mape,valid_mape
 
 def eva(model,fea,x_t,x_v,y_t,y_v):
-    if fea !=0:
+    if fea !=1:
         train_pred = model.predict(x_t[fea])
         valid_pred = model.predict(x_v[fea])
     else:
@@ -315,10 +315,10 @@ print(lr.intercept_)
 print(lr.coef_)
 
 #使用日期
-data2 = pd.get_dummies(data[['haversine','abs_lat_diff','abs_lon_diff','passenger_count','pickup_datetime','fare_amount','fare-bin']],columns="pickup_datetime")
+data2 = pd.get_dummies(data[['haversine','abs_lat_diff','abs_lon_diff','passenger_count','new_date','fare_amount','fare-bin']],columns=["new_date"])
 x_t,x_v,y_t,y_v = train_test_split(data2,np.array(data2['fare_amount']),random_state=RSEED,test_size=10000,stratify=data2['fare-bin'])
-x_t = x_t.drop(columns="fare-bin")
-x_v = y_t.drop(columns="fare-bin")
+x_t = x_t.drop(columns=["fare-bin","fare_amount"])
+x_v = x_v.drop(columns=["fare-bin","fare_amount"])
 lr.fit(x_t,y_t)
 
 eva(lr,1,x_t,x_v,y_t,y_v)
@@ -330,3 +330,4 @@ print(lr.coef_)
 corrs = data.corr()
 plt.figure(figsize=(12,12))
 sns.heatmap(corrs,annot=True,vmin=-1,vmax=1,fmt='.3f')
+plt.show()
