@@ -12,7 +12,7 @@ import seaborn as sns
 palette = sns.color_palette('Paired',10)
 
 #读取指定行数据，把pickup_datetime字段解析成日期格式
-data = pd.read_csv('./data/train.csv',nrows=50000,).drop(columns="key")
+data = pd.read_csv('./data/train.csv',nrows=50000,parse_dates=['pickup_datetime']).drop(columns="key")
 #剔除缺失值
 data = data.dropna()
 #查看数据前五行
@@ -220,22 +220,22 @@ plt.show()
 
 
 #日期相关性
-data["new_date"] = data['pickup_datetime'].map(lambda x:str(x[5:7]))
-print(data.groupby('new_date')['fare_amount'].agg(['mean','count']))
-data.groupby('new_date')['fare_amount'].mean().plot.bar(color = 'b')
+# data["new_date"] = data['pickup_datetime'].map(lambda x:str(x[5:7]))
+# print(data.groupby('new_date')['fare_amount'].agg(['mean','count']))
+# data.groupby('new_date')['fare_amount'].mean().plot.bar(color = 'b')
 
-plt.figure(figsize = (12, 6))
-for f, grouped in data.groupby('new_date'):
-    sns.kdeplot(grouped['fare_amount'], label = f'{f}')
-plt.xlabel('fare_amount'); plt.ylabel('density')
-plt.title('Distribution of Fare Amount by date')
-plt.show()
-
-data['new_date'].value_counts().plot.bar(color = 'b',edgecolor = 'k')
-plt.title('new_date counts')
-plt.xlabel('new_date')
-plt.ylabel('count')
-plt.show()
+# plt.figure(figsize = (12, 6))
+# for f, grouped in data.groupby('new_date'):
+#     sns.kdeplot(grouped['fare_amount'], label = f'{f}')
+# plt.xlabel('fare_amount'); plt.ylabel('density')
+# plt.title('Distribution of Fare Amount by date')
+# plt.show()
+#
+# data['new_date'].value_counts().plot.bar(color = 'b',edgecolor = 'k')
+# plt.title('new_date counts')
+# plt.xlabel('new_date')
+# plt.ylabel('count')
+# plt.show()
 
 #相关性
 corrs = data.corr()
@@ -315,19 +315,306 @@ print(lr.intercept_)
 print(lr.coef_)
 
 #使用日期
-data2 = pd.get_dummies(data[['haversine','abs_lat_diff','abs_lon_diff','passenger_count','new_date','fare_amount','fare-bin']],columns=["new_date"])
-x_t,x_v,y_t,y_v = train_test_split(data2,np.array(data2['fare_amount']),random_state=RSEED,test_size=10000,stratify=data2['fare-bin'])
-x_t = x_t.drop(columns=["fare-bin","fare_amount"])
-x_v = x_v.drop(columns=["fare-bin","fare_amount"])
-lr.fit(x_t,y_t)
-
-eva(lr,1,x_t,x_v,y_t,y_v)
-print('带有日期:')
-print(lr.intercept_)
-print(lr.coef_)
+# data2 = pd.get_dummies(data[['haversine','abs_lat_diff','abs_lon_diff','passenger_count','new_date','fare_amount','fare-bin']],columns=["new_date"])
+# x_t1,x_v,y_t,y_v = train_test_split(data2,np.array(data2['fare_amount']),random_state=RSEED,test_size=10000,stratify=data2['fare-bin'])
+# x_t1 = x_t1.drop(columns=["fare-bin","fare_amount"])
+# x_v = x_v.drop(columns=["fare-bin","fare_amount"])
+# lr.fit(x_t1,y_t)
+#
+# eva(lr,1,x_t1,x_v,y_t,y_v)
+# print('带有日期:')
+# print(lr.intercept_)
+# print(lr.coef_)
 
 #热力图
 corrs = data.corr()
 plt.figure(figsize=(12,12))
 sns.heatmap(corrs,annot=True,vmin=-1,vmax=1,fmt='.3f')
+plt.show()
+
+#使用随机森林回归
+from sklearn.ensemble import RandomForestRegressor
+
+random_forest = RandomForestRegressor(n_estimators=200,
+                                      max_depth=20,
+                                      max_features=None,
+                                      oob_score=True,
+                                      bootstrap=True,
+                                      verbose=1,
+                                      n_jobs=1
+                                      )
+random_forest.fit(x_t[['haversine', 'abs_lat_diff', 'abs_lon_diff', 'passenger_count']],y_t)
+eva(random_forest,['haversine','abs_lat_diff','abs_lon_diff','passenger_count'],x_t,x_v,y_t,y_v)
+
+#使用随机森林预测
+pres = random_forest.predict(test[['haversine','abs_lat_diff','abs_lon_diff','passenger_count']])
+
+sub = pd.DataFrame({'key':test_id,'fare_amount':pres})
+sub.to_csv("sub_rf_simple.csv",index=False)
+
+sns.distplot(sub['fare_amount'])
+plt.title('Distribution of Random Forest Predicted Fare Amount')
+plt.show()
+
+#查看线性回归的异常值点
+print(sub.loc[simple_over_100])
+
+#模型融合
+#print(x_t[['haversine', 'abs_lat_diff', 'abs_lon_diff', 'passenger_count']])
+lr_tpred = lr.predict(x_t[['haversine', 'abs_lat_diff', 'abs_lon_diff', 'passenger_count']])
+rf_tpred = random_forest.predict(x_t[['haversine', 'abs_lat_diff', 'abs_lon_diff', 'passenger_count']])
+
+lr_pred = lr.predict(x_v[['haversine', 'abs_lat_diff', 'abs_lon_diff', 'passenger_count']])
+rf_pred = random_forest.predict(x_v[['haversine', 'abs_lat_diff', 'abs_lon_diff', 'passenger_count']])
+
+# Average predictions
+train_pred = (lr_tpred + rf_tpred) / 2
+valid_pred = (lr_pred + rf_pred) / 2
+
+tr, vr, tm, vm = metrics(train_pred, valid_pred, y_t, y_v)
+
+print(f'Combined Training:   rmse = {round(tr, 2)} \t mape = {round(tm, 2)}')
+print(f'Combined Validation: rmse = {round(vr, 2)} \t mape = {round(vm, 2)}')
+
+#使用更多的特征
+def model_fr(x_t,x_v,y_t,y_v,test,fea,model=RandomForestRegressor(n_estimators=200,max_depth=20,n_jobs=1),return_model = False):
+    model.fit(x_t[fea],y_t)
+    eva(model,fea,x_t,x_v,y_t,y_v)
+    preds = model.predict(test[fea])
+    sub = pd.DataFrame({'key':test_id,'fare_amount':preds})
+
+    fea_i = pd.DataFrame({'fea':fea,'importance':model.feature_importances_}).sort_values('importance',ascending=False).set_index("fea")
+    if return_model:
+        return sub,fea_i,model
+    return sub,fea_i
+
+sub,fi = model_fr(x_t,x_v,y_t,y_v,test,fea = ['abs_lat_diff', 'abs_lon_diff', 'haversine', 'passenger_count','pickup_latitude', 'pickup_longitude', 'dropoff_latitude', 'dropoff_longitude'])
+
+#查看特征重要性
+fi.plot.bar(color = 'b',edgecolor = 'k',linewidth = 2)
+plt.title("feature importances")
+plt.show()
+
+sub.to_csv('sub_rf_8_features.csv', index = False)
+sub['fare_amount'].plot.hist()
+
+# 额外的特征工程
+import re
+
+
+def extract_dateinfo(df, date_col, drop=True, time=False,
+                     start_ref=pd.datetime(1900, 1, 1),
+                     extra_attr=False):
+
+    df = df.copy()
+
+    fld = df[date_col]
+
+    # 检查时间，isinstance判断类型
+    fld_dtype = fld.dtype
+    if isinstance(fld_dtype, pd.core.dtypes.dtypes.DatetimeTZDtype):
+        fld_dtype = np.datetime64
+
+    # Convert to datetime if not already
+    if not np.issubdtype(fld_dtype, np.datetime64):
+        df[date_col] = fld = pd.to_datetime(fld, infer_datetime_format=True)
+
+    # Prefix for new columns
+    pre = re.sub('[Dd]ate', '', date_col)
+    pre = re.sub('[Tt]ime', '', pre)
+
+    # Basic attributes
+    attr = ['Year', 'Month', 'Week', 'Day', 'Dayofweek', 'Dayofyear', 'Days_in_month', 'is_leap_year']
+
+    # Additional attributes
+    if extra_attr:
+        attr = attr + ['Is_month_end', 'Is_month_start', 'Is_quarter_end',
+                       'Is_quarter_start', 'Is_year_end', 'Is_year_start']
+
+    # If time is specified, extract time information
+    if time:
+        attr = attr + ['Hour', 'Minute', 'Second']
+
+    # Iterate through each attribute
+    for n in attr:
+        df[pre + n] = getattr(fld.dt, n.lower())
+
+    # Calculate days in year
+    df[pre + 'Days_in_year'] = df[pre + 'is_leap_year'] + 365
+
+    if time:
+        # Add fractional time of day (0 - 1) units of day
+        df[pre + 'frac_day'] = ((df[pre + 'Hour']) + (df[pre + 'Minute'] / 60) + (df[pre + 'Second'] / 60 / 60)) / 24
+
+        # Add fractional time of week (0 - 1) units of week
+        df[pre + 'frac_week'] = (df[pre + 'Dayofweek'] + df[pre + 'frac_day']) / 7
+
+        # Add fractional time of month (0 - 1) units of month
+        df[pre + 'frac_month'] = (df[pre + 'Day'] + (df[pre + 'frac_day'])) / (df[pre + 'Days_in_month'] + 1)
+
+        # Add fractional time of year (0 - 1) units of year
+        df[pre + 'frac_year'] = (df[pre + 'Dayofyear'] + df[pre + 'frac_day']) / (df[pre + 'Days_in_year'] + 1)
+
+    # Add seconds since start of reference
+    df[pre + 'Elapsed'] = (fld - start_ref).dt.total_seconds()
+
+    if drop:
+        df = df.drop(date_col, axis=1)
+
+    return df
+
+print(data['pickup_datetime'].min())
+print(test['pickup_datetime'].min())
+
+test = extract_dateinfo(test, 'pickup_datetime', drop = False,
+                         time = True, start_ref = data['pickup_datetime'].min())
+print(test.head())
+
+data = extract_dateinfo(data, 'pickup_datetime', drop = False,
+                         time = True, start_ref = data['pickup_datetime'].min())
+print(test.describe())
+
+sns.lmplot('pickup_Elapsed', 'fare_amount', hue = 'pickup_Year', palette=palette, size = 8,
+           scatter_kws= {'alpha': 0.05}, markers = '.', fit_reg = False,
+           data = data);
+plt.title('Fare Amount versus Time Since Start of Records');
+
+plt.figure(figsize = (10, 8))
+for h, grouped in data.groupby('pickup_Hour'):
+    sns.kdeplot(grouped['fare_amount'], label = f'{h} hour');
+plt.title('Fare Amount by Hour of Day');
+
+plt.figure(figsize = (10, 8))
+for d, grouped in data.groupby('pickup_Dayofweek'):
+    sns.kdeplot(grouped['fare_amount'], label = f'{d}')
+plt.title('Fare Amount by Day of Week');
+
+fig, axes = plt.subplots(2, 2, figsize=(20, 20))
+axes = axes.flatten()
+
+# Plot each of the fractional times
+for i, d in enumerate(['day', 'week', 'month', 'year']):
+    ax = axes[i]
+    sns.regplot(f'pickup_frac_{d}', 'fare_amount',
+                data=data,
+                fit_reg=False, scatter_kws={'alpha': 0.05}, marker='.', ax=ax,
+                color='r')
+
+    ax.set_title(f'Fare Amount vs pickup_frac_{d}')
+
+#返回唯一值
+fare_counts = data.groupby('fare_amount')['haversine'].agg(['count', pd.Series.nunique]).sort_values('count', ascending = False)
+print(fare_counts.head())
+
+#相关性
+corrs['fare_amount'].plot.bar(color = 'b', figsize = (10, 6));
+plt.title('Correlation with Fare Amount');
+plt.show()
+
+#测试时间特征
+X_train, X_valid, y_train, y_valid = train_test_split(data, np.array(data['fare_amount']),
+                                                      stratify = data['fare-bin'],
+                                                      random_state = RSEED, test_size = 50000)
+
+time_features = ['pickup_frac_day', 'pickup_frac_week', 'pickup_frac_year', 'pickup_Elapsed']
+#需要的特征
+features = ['abs_lat_diff', 'abs_lon_diff', 'haversine', 'passenger_count',
+            'pickup_latitude', 'pickup_longitude',
+            'dropoff_latitude', 'dropoff_longitude'] + time_features
+
+sub, fi = model_fr(X_train, X_valid, y_train, y_valid, test,
+                   features = features)
+lr = LinearRegression()
+
+# Fit and evaluate
+lr.fit(X_train[features], y_train)
+eva(lr, features, X_train, X_valid, y_train, y_valid)
+
+plt.figure(figsize = (10, 8))
+fi['importance'].plot.bar(color = 'g', edgecolor = 'k');
+plt.ylabel('Importance'); plt.title('Feature Importances');
+plt.show()
+sub.to_csv('sub_rf_frac_time.csv', index = False)
+
+features = list(data.columns)
+
+for f in ['pickup_datetime', 'fare_amount', 'fare-bin', 'color']:
+    features.remove(f)
+
+sub, fi, random_forest = model_fr(X_train, X_valid, y_train, y_valid, test,
+                                  features = features, return_model = True)
+
+plt.figure(figsize = (12, 7))
+fi['importance'].plot.bar(color = 'g', edgecolor = 'k');
+plt.ylabel('Importance'); plt.title('Feature Importances');
+plt.show()
+
+sub.to_csv('sub_rf_all_features.csv', index = False)
+
+valid_preds = random_forest.predict(X_valid[features])
+
+plt.figure(figsize = (10, 6))
+sns.kdeplot(y_valid, label = 'Actual')
+sns.kdeplot(valid_preds, label = 'Predicted')
+plt.legend(prop = {'size': 30})
+plt.title("Distribution of Validation Fares");
+plt.show()
+
+xv, yv = ecdf(valid_preds)
+xtrue, ytrue = ecdf(y_valid)
+
+# Plot the ecdfs on same plot
+plt.scatter(xv, yv, s = 0.02,  c = 'r', marker = '.', label = 'Predicted')
+plt.scatter(xtrue, ytrue, s = 0.02, c = 'b', marker = '.', label = 'True')
+plt.title('ECDF of Predicted and Actual Validation')
+
+plt.legend(markerscale = 100, prop = {'size': 20});
+plt.show()
+
+analyze = pd.DataFrame({'predicted': valid_preds, 'actual': y_valid})
+print(analyze.describe())
+
+from sklearn.model_selection import RandomizedSearchCV
+
+# Hyperparameter grid
+param_grid = {
+    'n_estimators': np.linspace(10, 100).astype(int),
+    'max_depth': [None] + list(np.linspace(5, 30).astype(int)),
+    'max_features': ['auto', 'sqrt', None] + list(np.arange(0.5, 1, 0.1)),
+    'max_leaf_nodes': [None] + list(np.linspace(10, 50, 500).astype(int)),
+    'min_samples_split': [2, 5, 10],
+    'bootstrap': [True, False]
+}
+
+# Estimator for use in random search
+estimator = RandomForestRegressor(random_state = RSEED)
+
+# Create the random search model
+rs = RandomizedSearchCV(estimator, param_grid, n_jobs = -1,
+                        scoring = 'neg_mean_absolute_error', cv = 3,
+                        n_iter = 100, verbose = 1, random_state=RSEED)
+
+tune_data = data
+
+# Select features
+time_features = ['pickup_frac_day', 'pickup_frac_week', 'pickup_frac_year', 'pickup_Elapsed']
+
+features = ['abs_lat_diff', 'abs_lon_diff', 'haversine', 'passenger_count',
+            'pickup_latitude', 'pickup_longitude',
+            'dropoff_latitude', 'dropoff_longitude'] + time_features
+
+rs.fit(tune_data[features], np.array(tune_data['fare_amount']))
+
+model = rs.best_estimator_
+print(f'The best parameters were {rs.best_params_} with a negative mae of {rs.best_score_}')
+
+model.n_jobs = -1
+model.fit(X_train[features], y_train)
+
+eva(model, features, X_train, X_valid, y_train, y_valid)
+pred = np.array(model.predict(test[features])).reshape((-1))
+sub = pd.DataFrame({'key': test_id, 'fare_amount': pred})
+sub.to_csv('sub_rf_tuned.csv', index = False)
+sub['fare_amount'].plot.hist();
+plt.title('Predicted Test Fare Distribution');
 plt.show()
