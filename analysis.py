@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 
+#https://www.kaggle.com/willkoehrsen/a-walkthrough-and-a-challenge
+
 pd.set_option('display.float_format',lambda  x: '%.3f' %x)
 RSEED = 100
 import  matplotlib.pyplot as plt
@@ -407,7 +409,7 @@ def extract_dateinfo(df, date_col, drop=True, time=False,
                      extra_attr=False):
 
     df = df.copy()
-
+    #获取时间列
     fld = df[date_col]
 
     # 检查时间，isinstance判断类型
@@ -435,27 +437,27 @@ def extract_dateinfo(df, date_col, drop=True, time=False,
     if time:
         attr = attr + ['Hour', 'Minute', 'Second']
 
-    # Iterate through each attribute
+    # getattr直接获取对象的属性，类型为fld.dt
     for n in attr:
         df[pre + n] = getattr(fld.dt, n.lower())
 
-    # Calculate days in year
+    # 是否是闰年
     df[pre + 'Days_in_year'] = df[pre + 'is_leap_year'] + 365
 
     if time:
-        # Add fractional time of day (0 - 1) units of day
+        # 在一天中的占比
         df[pre + 'frac_day'] = ((df[pre + 'Hour']) + (df[pre + 'Minute'] / 60) + (df[pre + 'Second'] / 60 / 60)) / 24
 
-        # Add fractional time of week (0 - 1) units of week
+        # 在一个星期中的占比
         df[pre + 'frac_week'] = (df[pre + 'Dayofweek'] + df[pre + 'frac_day']) / 7
 
-        # Add fractional time of month (0 - 1) units of month
+        # 在一个月中的占比
         df[pre + 'frac_month'] = (df[pre + 'Day'] + (df[pre + 'frac_day'])) / (df[pre + 'Days_in_month'] + 1)
 
-        # Add fractional time of year (0 - 1) units of year
+        # 计算一年中天数的占比
         df[pre + 'frac_year'] = (df[pre + 'Dayofyear'] + df[pre + 'frac_day']) / (df[pre + 'Days_in_year'] + 1)
 
-    # Add seconds since start of reference
+    # 计算和最开始时间的秒数
     df[pre + 'Elapsed'] = (fld - start_ref).dt.total_seconds()
 
     if drop:
@@ -463,17 +465,18 @@ def extract_dateinfo(df, date_col, drop=True, time=False,
 
     return df
 
+#分别获取训练集和测试集最早的日期
 print(data['pickup_datetime'].min())
 print(test['pickup_datetime'].min())
-
+#查看测试集的前几行
 test = extract_dateinfo(test, 'pickup_datetime', drop = False,
                          time = True, start_ref = data['pickup_datetime'].min())
 print(test.head())
-
+#查看训练集的情况
 data = extract_dateinfo(data, 'pickup_datetime', drop = False,
                          time = True, start_ref = data['pickup_datetime'].min())
 print(test.describe())
-
+#年份和价格关系
 sns.lmplot('pickup_Elapsed', 'fare_amount', hue = 'pickup_Year', palette=palette, size = 8,
            scatter_kws= {'alpha': 0.05}, markers = '.', fit_reg = False,
            data = data);

@@ -8,9 +8,12 @@ print(lon1,lat1,lon2,lat2)
 
 import pandas as pd
 
-data = pd.read_csv('./data/train.csv',nrows=500)
-data['ss'] = data['pickup_datetime'].map(lambda x:str(x[5:7]))
-print(data['ss'])
+attr = ['Year', 'Month', 'Week', 'Day', 'Dayofweek', 'Dayofyear', 'Days_in_month', 'is_leap_year']
 
+data = pd.read_csv('./data/train.csv',nrows=500,parse_dates=['pickup_datetime'])
+data['ss'] = data['pickup_datetime']
+for n in attr:
+    data[ n] = getattr(data['ss'].dt,n.lower())
+print(data[0:5])
 m = 1
 print([m for _ in range(5)])
