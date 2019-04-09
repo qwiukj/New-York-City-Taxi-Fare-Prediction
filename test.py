@@ -11,6 +11,11 @@ import pandas as pd
 attr = ['Year', 'Month', 'Week', 'Day', 'Dayofweek', 'Dayofyear', 'Days_in_month', 'is_leap_year']
 
 data = pd.read_csv('./data/train.csv',nrows=500,parse_dates=['pickup_datetime'])
+print("===========================")
+for i,j in data.groupby("passenger_count"):
+    print(i)
+    #print(j)
+print("==========================")
 data['ss'] = data['pickup_datetime']
 for n in attr:
     data[ n] = getattr(data['ss'].dt,n.lower())

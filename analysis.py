@@ -481,12 +481,12 @@ sns.lmplot('pickup_Elapsed', 'fare_amount', hue = 'pickup_Year', palette=palette
            scatter_kws= {'alpha': 0.05}, markers = '.', fit_reg = False,
            data = data);
 plt.title('Fare Amount versus Time Since Start of Records');
-
+#比较各小时价格差异
 plt.figure(figsize = (10, 8))
 for h, grouped in data.groupby('pickup_Hour'):
     sns.kdeplot(grouped['fare_amount'], label = f'{h} hour');
 plt.title('Fare Amount by Hour of Day');
-
+#比较星期差异
 plt.figure(figsize = (10, 8))
 for d, grouped in data.groupby('pickup_Dayofweek'):
     sns.kdeplot(grouped['fare_amount'], label = f'{d}')
@@ -495,7 +495,7 @@ plt.title('Fare Amount by Day of Week');
 fig, axes = plt.subplots(2, 2, figsize=(20, 20))
 axes = axes.flatten()
 
-# Plot each of the fractional times
+# 按所占小数比较年月星期小时，比较价格差异
 for i, d in enumerate(['day', 'week', 'month', 'year']):
     ax = axes[i]
     sns.regplot(f'pickup_frac_{d}', 'fare_amount',
@@ -505,55 +505,57 @@ for i, d in enumerate(['day', 'week', 'month', 'year']):
 
     ax.set_title(f'Fare Amount vs pickup_frac_{d}')
 
-#返回唯一值
+#查看重复和不重复值的个数
 fare_counts = data.groupby('fare_amount')['haversine'].agg(['count', pd.Series.nunique]).sort_values('count', ascending = False)
 print(fare_counts.head())
 
 #相关性
+corrs = data.corr()
 corrs['fare_amount'].plot.bar(color = 'b', figsize = (10, 6));
 plt.title('Correlation with Fare Amount');
 plt.show()
 
-#测试时间特征
+#拆分数据集
 X_train, X_valid, y_train, y_valid = train_test_split(data, np.array(data['fare_amount']),
                                                       stratify = data['fare-bin'],
                                                       random_state = RSEED, test_size = 50000)
 
-time_features = ['pickup_frac_day', 'pickup_frac_week', 'pickup_frac_year', 'pickup_Elapsed']
 #需要的特征
+time_features = ['pickup_frac_day', 'pickup_frac_week', 'pickup_frac_year', 'pickup_Elapsed']
 features = ['abs_lat_diff', 'abs_lon_diff', 'haversine', 'passenger_count',
             'pickup_latitude', 'pickup_longitude',
             'dropoff_latitude', 'dropoff_longitude'] + time_features
-
+#随机森林建模
 sub, fi = model_fr(X_train, X_valid, y_train, y_valid, test,
                    features = features)
 lr = LinearRegression()
 
-# Fit and evaluate
+# 线性回归建模
 lr.fit(X_train[features], y_train)
 eva(lr, features, X_train, X_valid, y_train, y_valid)
-
+#查看特征重要性
 plt.figure(figsize = (10, 8))
 fi['importance'].plot.bar(color = 'g', edgecolor = 'k');
 plt.ylabel('Importance'); plt.title('Feature Importances');
 plt.show()
+#结果保存
 sub.to_csv('sub_rf_frac_time.csv', index = False)
-
+#移除部分特征
 features = list(data.columns)
 
 for f in ['pickup_datetime', 'fare_amount', 'fare-bin', 'color']:
     features.remove(f)
-
+#随机森林建模
 sub, fi, random_forest = model_fr(X_train, X_valid, y_train, y_valid, test,
                                   features = features, return_model = True)
-
+#查看特征重要性
 plt.figure(figsize = (12, 7))
 fi['importance'].plot.bar(color = 'g', edgecolor = 'k');
 plt.ylabel('Importance'); plt.title('Feature Importances');
 plt.show()
-
+#结果保存
 sub.to_csv('sub_rf_all_features.csv', index = False)
-
+#预测并画图
 valid_preds = random_forest.predict(X_valid[features])
 
 plt.figure(figsize = (10, 6))
@@ -562,7 +564,7 @@ sns.kdeplot(valid_preds, label = 'Predicted')
 plt.legend(prop = {'size': 30})
 plt.title("Distribution of Validation Fares");
 plt.show()
-
+#画百分比图
 xv, yv = ecdf(valid_preds)
 xtrue, ytrue = ecdf(y_valid)
 
@@ -573,7 +575,7 @@ plt.title('ECDF of Predicted and Actual Validation')
 
 plt.legend(markerscale = 100, prop = {'size': 20});
 plt.show()
-
+#查看预测概要
 analyze = pd.DataFrame({'predicted': valid_preds, 'actual': y_valid})
 print(analyze.describe())
 
