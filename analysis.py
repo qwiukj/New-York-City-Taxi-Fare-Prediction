@@ -369,7 +369,7 @@ rf_tpred = random_forest.predict(x_t[['haversine', 'abs_lat_diff', 'abs_lon_diff
 lr_pred = lr.predict(x_v[['haversine', 'abs_lat_diff', 'abs_lon_diff', 'passenger_count']])
 rf_pred = random_forest.predict(x_v[['haversine', 'abs_lat_diff', 'abs_lon_diff', 'passenger_count']])
 
-# Average predictions
+# 平均预测
 train_pred = (lr_tpred + rf_tpred) / 2
 valid_pred = (lr_pred + rf_pred) / 2
 
@@ -402,7 +402,6 @@ sub['fare_amount'].plot.hist()
 
 # 额外的特征工程
 import re
-
 
 def extract_dateinfo(df, date_col, drop=True, time=False,
                      start_ref=pd.datetime(1900, 1, 1),
@@ -504,7 +503,7 @@ for i, d in enumerate(['day', 'week', 'month', 'year']):
                 color='r')
 
     ax.set_title(f'Fare Amount vs pickup_frac_{d}')
-
+plt.show()
 #查看重复和不重复值的个数
 fare_counts = data.groupby('fare_amount')['haversine'].agg(['count', pd.Series.nunique]).sort_values('count', ascending = False)
 print(fare_counts.head())
@@ -518,7 +517,7 @@ plt.show()
 #拆分数据集
 X_train, X_valid, y_train, y_valid = train_test_split(data, np.array(data['fare_amount']),
                                                       stratify = data['fare-bin'],
-                                                      random_state = RSEED, test_size = 50000)
+                                                      random_state = RSEED, test_size = 47000)
 
 #需要的特征
 time_features = ['pickup_frac_day', 'pickup_frac_week', 'pickup_frac_year', 'pickup_Elapsed']
@@ -527,7 +526,7 @@ features = ['abs_lat_diff', 'abs_lon_diff', 'haversine', 'passenger_count',
             'dropoff_latitude', 'dropoff_longitude'] + time_features
 #随机森林建模
 sub, fi = model_fr(X_train, X_valid, y_train, y_valid, test,
-                   features = features)
+                   fea = features)
 lr = LinearRegression()
 
 # 线性回归建模
@@ -547,7 +546,7 @@ for f in ['pickup_datetime', 'fare_amount', 'fare-bin', 'color']:
     features.remove(f)
 #随机森林建模
 sub, fi, random_forest = model_fr(X_train, X_valid, y_train, y_valid, test,
-                                  features = features, return_model = True)
+                                  fea = features, return_model = True)
 #查看特征重要性
 plt.figure(figsize = (12, 7))
 fi['importance'].plot.bar(color = 'g', edgecolor = 'k');
