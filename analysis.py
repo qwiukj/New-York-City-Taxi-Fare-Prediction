@@ -575,13 +575,13 @@ plt.title('ECDF of Predicted and Actual Validation')
 
 plt.legend(markerscale = 100, prop = {'size': 20});
 plt.show()
-#查看预测概要
+#查看预测值概要
 analyze = pd.DataFrame({'predicted': valid_preds, 'actual': y_valid})
 print(analyze.describe())
 
 from sklearn.model_selection import RandomizedSearchCV
 
-# Hyperparameter grid
+# 超参数集合
 param_grid = {
     'n_estimators': np.linspace(10, 100).astype(int),
     'max_depth': [None] + list(np.linspace(5, 30).astype(int)),
@@ -591,35 +591,36 @@ param_grid = {
     'bootstrap': [True, False]
 }
 
-# Estimator for use in random search
+# 随机森林回归实例化
 estimator = RandomForestRegressor(random_state = RSEED)
 
-# Create the random search model
+# 创建随机搜索
 rs = RandomizedSearchCV(estimator, param_grid, n_jobs = -1,
                         scoring = 'neg_mean_absolute_error', cv = 3,
                         n_iter = 100, verbose = 1, random_state=RSEED)
 
 tune_data = data
 
-# Select features
+# 特征挑选
 time_features = ['pickup_frac_day', 'pickup_frac_week', 'pickup_frac_year', 'pickup_Elapsed']
 
 features = ['abs_lat_diff', 'abs_lon_diff', 'haversine', 'passenger_count',
             'pickup_latitude', 'pickup_longitude',
             'dropoff_latitude', 'dropoff_longitude'] + time_features
-
+#训练
 rs.fit(tune_data[features], np.array(tune_data['fare_amount']))
-
+#打印最优参数，使用最优模型
 model = rs.best_estimator_
 print(f'The best parameters were {rs.best_params_} with a negative mae of {rs.best_score_}')
-
+#使用最优模型训练
 model.n_jobs = -1
 model.fit(X_train[features], y_train)
-
+#评价
 eva(model, features, X_train, X_valid, y_train, y_valid)
 pred = np.array(model.predict(test[features])).reshape((-1))
 sub = pd.DataFrame({'key': test_id, 'fare_amount': pred})
 sub.to_csv('sub_rf_tuned.csv', index = False)
+#查看预测结果
 sub['fare_amount'].plot.hist();
 plt.title('Predicted Test Fare Distribution');
 plt.show()
