@@ -23,6 +23,8 @@ print(data.head())
 print(data.describe())
 
 #画出价格分布图
+# seaborn的displot()集合了matplotlib的hist()与核函数估计kdeplot的功能，增加了rugplot分布观测条显示与利用scipy库fit拟合参数分布的新颖用途。具体用法如下：
+#seaborn.distplot(a, bins=None, hist=True, kde=True, rug=False, fit=None, hist_kws=None, kde_kws=None, rug_kws=None, fit_kws=None, color=None, vertical=False, norm_hist=False, axlabel=None, label=None, ax=None)
 plt.figure(figsize=(10,6))
 sns.distplot(data['fare_amount'])
 plt.title("Distribution of Fare")
@@ -40,7 +42,7 @@ data['fare-bin'] = pd.cut(data['fare_amount'],bins = list(range(0,50,5))).astype
 data.loc[data['fare-bin'] == 'nan','fare-bin'] = '[45+]'
 data.loc[data['fare-bin'] == '(5,10]','fare-bin'] = '(05,10]'
 
-#画出价格的区间分布图
+#画出价格的区间分布图，  画出条形图
 data['fare-bin'].value_counts().sort_index().plot.bar(color = 'b',edgecolor = 'k')
 plt.title("Fare Binned")
 plt.show()
@@ -61,7 +63,7 @@ plt.xlabel('Fare amount')
 plt.title('ECDF of Fare Amount')
 plt.show()
 
-#画出顾客分布图
+#画出顾客分布图，条形图
 data['passenger_count'].value_counts().plot.bar(color = 'b',edgecolor = 'k')
 plt.title('passenger counts')
 plt.xlabel('number of passenger')
@@ -83,9 +85,11 @@ data = data.loc[data['dropoff_latitude'].between(39,42)]
 data = data.loc[data['dropoff_longitude'].between(-75,-72)]
 print("现在的数据量为：%d"%data.shape[0])
 
+#多个图
 fig,axes = plt.subplots(1,2,figsize = (20,8),sharex=True,sharey=True)
 axes = axes.flatten()
 
+#画散点图
 sns.regplot('pickup_longitude','pickup_latitude',fit_reg = False,data=data,ax=axes[0])
 sns.regplot('dropoff_longitude','dropoff_latitude',fit_reg = False,data=data,ax=axes[1])
 axes[0].set_title('pickup locations')
@@ -96,6 +100,7 @@ plt.show()
 data['abs_lat_diff'] = (data['dropoff_latitude']-data['pickup_latitude']).abs()
 data['abs_lon_diff'] = (data['dropoff_longitude']-data['pickup_longitude']).abs()
 
+#画散点图
 sns.lmplot("abs_lat_diff",'abs_lon_diff',fit_reg=False,data = data)
 plt.title('Absolute latitude difference vs Absolute longitude difference')
 plt.show()
@@ -116,8 +121,8 @@ plt.show()
 def minkowski_distance(x1,x2,y1,y2,p):
     return ((abs(x2-x1)**p)+(abs(y2-y1)**p))**(1/p)
 data['manhattan'] = minkowski_distance(data['pickup_longitude'],data['dropoff_longitude'],data['pickup_latitude'],data['dropoff_latitude'],1)
-plt.figure(figsize=(12,6))
 
+plt.figure(figsize=(12,6))
 print(data.groupby('fare-bin'))
 #groupby返回值为键值对
 
@@ -125,6 +130,7 @@ print(data.groupby('fare-bin'))
 color_mapping = {fare_bin: palette[i] for i, fare_bin in enumerate(data['fare-bin'].unique())}
 data['color'] = data['fare-bin'].map(color_mapping)
 
+#kdeplot核密度估计图
 for f,group in data.groupby('fare-bin'):
     sns.kdeplot(group['manhattan'],label=f,color = list(group['color'])[0])
 
@@ -142,7 +148,7 @@ plt.show()
 data['euclidean'] = minkowski_distance(data['pickup_longitude'], data['dropoff_longitude'],
                                        data['pickup_latitude'], data['dropoff_latitude'], 2)
 
-# Calculate distribution by each fare bin
+# 核密度估计图
 plt.figure(figsize = (12, 6))
 for f, grouped in data.groupby('fare-bin'):
     sns.kdeplot(grouped['euclidean'], label = f'{f}', color = list(grouped['color'])[0]);
@@ -176,7 +182,7 @@ test = pd.read_csv('./data/test.csv',parse_dates = ['pickup_datetime'])
 test['abs_lat_diff'] = (test['dropoff_latitude'] - test['pickup_latitude']).abs()
 test['abs_lon_diff'] = (test['dropoff_longitude'] - test['pickup_longitude']).abs()
 
-# Save the id for submission
+# 存储id
 test_id = list(test.pop('key'))
 test.describe()
 
@@ -567,11 +573,11 @@ plt.show()
 xv, yv = ecdf(valid_preds)
 xtrue, ytrue = ecdf(y_valid)
 
-# Plot the ecdfs on same plot
+# 画散点图
 plt.scatter(xv, yv, s = 0.02,  c = 'r', marker = '.', label = 'Predicted')
 plt.scatter(xtrue, ytrue, s = 0.02, c = 'b', marker = '.', label = 'True')
 plt.title('ECDF of Predicted and Actual Validation')
-
+#图例设置
 plt.legend(markerscale = 100, prop = {'size': 20});
 plt.show()
 #查看预测值概要
